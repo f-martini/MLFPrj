@@ -1,8 +1,9 @@
 function [U,lambda]=eigen_training(A)
 
-% This function compute the eigenvector from the matrix A which contains 
-% the input dataset (vectorized) and peprocessed  
-%
+% This function computes the eigenvector from the matrix A which contains 
+% the input dataset (vectorized and peprocessed).  
+% It computes the eigenfaces wrt the input dataset images and then extract 
+% from them the proper M normalized eigenvectors. 
 
 M = size(A,2);
 N = size(A,1);

@@ -11,11 +11,11 @@ A = double(A);
 T = 32;
 
 for i=1:M
-    tmp = imresize(rgb2gray(readimage(imds,i)), [r c]);
+    tmp = imresize(rgb2gray(readimage(imds,i)), [r c]);         % dataset loading
     A(:, i) = tmp(:);
 end
 
-media = mean(A,2);
+media = mean(A,2);                                              % mean computation
 
 for i=1:M
     A(:,i) = A(:,i) - media;
@@ -24,12 +24,9 @@ end
 [U,lambda] = eigen_training(A);
 data = U(:,1:T)'*A;
 
-% figure;
-% set(gcf,'name','mean face');
-% mimage = reshape(media,r,c);
-% imagesc(mimage);
-% colormap gray, axis image;
-
+%y = cumsum(lambda)/sum(lambda);
+%plot(y); title('Modelled Information')
+%scatter([1:M],y);
 
 
 
