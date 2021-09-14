@@ -14,16 +14,18 @@ clear all;
 close all;
 clc;
 
+
+%%
 % Functions path:
 addpath(fullfile('./fun'));
 
 % Defalut values:
 defdatasetPath = fullfile('./data');
-maxIter = 1000;
-defH = 0.1;
-defK = 5;
-defT = 0;
+defH = 2;
+defK = 10;
+defT = 5.0;
 flag = true;
+
 
 %% Dataset Loading
 datasetPath = input('\nSubmit dataset path:\n\n', 's');
@@ -32,7 +34,20 @@ if isempty(datasetPath)
 end
 imds = imageDatastore(datasetPath, 'IncludeSubfolders',true);
 
+% Prepare dataset for visualization
+dataset = zeros(256, 256, size(imds.Files, 1));
+for i=1:size(imds.Files, 1)
+    tmp = imresize(rgb2gray(readimage(imds,i)), [256 256]);
+    dataset(:,:, i) = tmp(:,:);
+end
 
+[datasetPath, namedata, ext] = fileparts(datasetPath);
+if size(namedata, 2) == 0
+   [datasetPath, namedata, ext] = fileparts(datasetPath);
+end  
+
+
+%%
 while flag
     %% 
     % Clustering Parameter  
@@ -43,7 +58,7 @@ while flag
             '1 - Bag of Words: Regular Grid\n\n']);
 
     reply = input('');
-    if ~isempty(reply) & reply == 1
+    if ~isempty(reply) && reply == 1
         featExtraction = @RG;
     else
         featExtraction = @PCA; %Default   
@@ -52,7 +67,7 @@ while flag
     % Clustering Techinque;
     fprintf(['\nPlease, select a CLUSTERING techinique submitting its number:\n' ...
             '0 - BSAS\n' ...
-            '1 - Manifold Learning\n' ...
+            '1 - Mean Shift\n' ...
             '2 - Expectation Maximization\n\n']);
 
     reply = input('');
@@ -62,12 +77,12 @@ while flag
     else
         switch (reply)
             case 0
-                clustAlg = @KM;
-                prm = initParam(defT,'\nBSAS --- Submit threshold:\n');
+                clustAlg = @BSAS;
+                prm = initParam(defT,'\nBSAS --- Submit max number of clusters K:\n');
 
             case 1
-                clustAlg = @ML;
-                prm = InitParam(defH, '\nManifold Learning --- Submit H value:\n');
+                clustAlg = @MS;
+                prm = initParam(defH, '\nMean Shift --- Submit H value:\n');
 
             otherwise
                 clustAlg = @EM; %Default
@@ -77,17 +92,18 @@ while flag
 
 
     % Result Saving
-    reply = input('\nWould you like to save the results? [Y/N]\n\n');
-    if ~isempty(reply) & reply == 'N'
+    reply = input('\nWould you like to save the results? [Y/N]\n\n', 's');
+    if ~isempty(reply) && reply == 'N'
         saveRes = reply;
     else
         saveRes = 'Y'; %Default
     end  
 
+    
     %%
     % Feature Extraction:
-    
-    resfile = ['./save/', func2str(featExtraction), 'res', '32', '.mat'];
+      
+    resfile = ['./save/', namedata, func2str(featExtraction), 'res', '32', '.mat'];
     if isfile(resfile)
         load(resfile);
     else
@@ -97,17 +113,57 @@ while flag
         end
     end   
     
+    
     %%
     % Clustering:
+    fresfile = ['./save/', namedata, func2str(clustAlg), 'res', func2str(featExtraction), '32','par', num2str(prm), '.mat'];
+    if isfile(fresfile)
+        load(fresfile);
+    else
+        %A = normalize(F);
+        A = normalize(F,  'norm');
+        [model, res] = clustAlg(A, prm);
+        if saveRes == 'Y'
+            save(fresfile, 'model', 'res');
+        end
+    end
 
-    C = clustAlg(F);
+    
+    %%
+    % Visualization:
+    
+    ncls = max(res.labels);
+    clsimages = zeros(256, 256, ncls);
+    f1 = figure;
+    for i=1:size(imds.Files, 1)
+        clsimages(:,:,res.labels(i)) = clsimages(:,:,res.labels(i)) + dataset(:,:,i);
+    end
+    
+    if ncls >= 25
+        ncls = 25;
+        [res.count, I] = sort(res.count, 'descend');
+    else
+        I = [1:1:ncls];
+    end
+    
+    x = ceil(sqrt(ncls));
+    
+    for i=1:ncls
+        clsimages(:,:,I(i)) = clsimages(:,:,I(i))/res.count(I(i));
+        subaxis(x,x,i,'SpacingVertical',0.01,'SpacingHorizontal',0.01, 'Padding', 0, 'MarginLeft',.01,'MarginRight',.01);
+        imagesc(clsimages(:,:,I(i)));
+        colormap gray;
+        axis off;
+    end
 
+    
     %%
     % Exit flag update
-    reply = input('\nWould you like to try with other parameters? [Y/N]\n\n');
+    reply = input('\nWould you like to try with other parameters? [Y/N]\n\n', 's');
     if isempty(reply) || reply ~= 'Y'
         flag = false;
     end  
+    
 end
 
 %%
@@ -118,10 +174,9 @@ end
 function K = initParam(default, txt)
 
     % Checks input validity 
-
     fprintf(txt);
     reply = input('');
-    if ~isempty(reply) & isnumeric(reply)
+    if ~isempty(reply) && isnumeric(reply)
         K = reply;
     else
         K = default;
